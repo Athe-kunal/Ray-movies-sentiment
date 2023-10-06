@@ -91,7 +91,7 @@ param_space = {
         "lr_factor": tune.uniform(0.1, 0.9),
         "lr_patience": tune.uniform(1, 10),
     },
-    "log_level":"DEBUG"
+    # "log_level":"DEBUG"
 
 }
 
