@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parallel.distributed import DistributedDataParallel
 from transformers import RobertaModel
-from ray.air import Checkpoint
+from ray.train import Checkpoint
 from ray.train.torch import get_device
 from dotenv import load_dotenv
 ray.data.DatasetContext.get_current().execution_options.preserve_order = True
@@ -49,7 +49,7 @@ def train_loop_per_worker(config):
     batch_size_per_worker = batch_size // num_workers
     for epoch in range(num_epochs):
         # Step
-        train_loss = train_step(train_ds, batch_size_per_worker, model, num_classes, optimizer)
+        train_loss = train_step(train_ds, batch_size_per_worker, model, num_classes, loss_fn, optimizer)
         val_loss, _, _ = eval_step(val_ds, batch_size_per_worker, model, num_classes, loss_fn)
         scheduler.step(val_loss)
 
@@ -140,24 +140,15 @@ def collate_fn(batch):
         tensor_batch[key] = torch.as_tensor(array, dtype=dtypes[key], device=get_device())
     return tensor_batch
 
-def train_step(ds, batch_size, model, num_classes, optimizer):
+def train_step(ds, batch_size, model, num_classes, loss_fn, optimizer):
     """Train step."""
     model.train()
     loss = 0.0
     ds_generator = ds.iter_torch_batches(batch_size=batch_size, collate_fn=collate_fn)
-    batch_counts = []
     for i, batch in enumerate(ds_generator):
-        class_sample_count = np.unique(batch['targets'], return_counts=True)[1]
-        weight = 1. / class_sample_count
-        samples_weight = weight[batch['targets']]
-        samples_weight = torch.from_numpy(samples_weight)
-        counts = [sum(count) for count in zip(*batch_counts)]
-        class_weights = np.array([1.0/count for i, count in enumerate(counts)])
-        class_weights_tensor = torch.Tensor(class_weights).to(get_device())
         optimizer.zero_grad()  # reset gradients
         z = model(batch)  # forward pass
         targets = F.one_hot(batch["targets"], num_classes=num_classes).float()  # one-hot (for loss_fn)
-        loss_fn = nn.BCEWithLogitsLoss(weight=samples_weight)
         J = loss_fn(z, targets)  # define loss
         J.backward()  # backward pass
         optimizer.step()  # update weights

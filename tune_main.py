@@ -8,8 +8,8 @@ from ray.tune.schedulers import AsyncHyperBandScheduler
 from ray.tune.search import ConcurrencyLimiter
 from ray.tune.search.hyperopt import HyperOptSearch
 from pathlib import Path
-from ray.air import Checkpoint,CheckpointConfig,ScalingConfig,RunConfig
-from ray.train import DataConfig
+import ray.train as train
+from ray.train import Checkpoint, CheckpointConfig, DataConfig, RunConfig, ScalingConfig
 from ray.train.torch import TorchCheckpoint, TorchTrainer
 import tempfile
 import torch
@@ -20,7 +20,7 @@ import torch.nn.functional as F
 from torch.nn.parallel.distributed import DistributedDataParallel
 from transformers import RobertaModel,RobertaTokenizer
 from ray.train.torch import get_device
-from ray.air.integrations.wandb import WandbLoggerCallback
+from ray.tune.logger.wandb import WandbLoggerCallback
 import config
 import wandb
 from dotenv import load_dotenv
@@ -29,11 +29,11 @@ from process_data import *
 ray.data.DatasetContext.get_current().execution_options.preserve_order = True
 
 num_workers = 1
-resources_per_worker={"CPU": 1, "GPU": 0}
+resources_per_worker={"CPU": 1, "GPU": 1}
 
 load_dotenv()
 
-wandb_api_key = os.getenv("WANDB_API")
+wandb_api_key = "70e95a405ea4aec8d0a637460407bf21c69436f4"
 
 num_classes = 3
 train_loop_config = {
@@ -66,8 +66,8 @@ wandb_callback = WandbLoggerCallback(
 run_config = RunConfig(
     callbacks=[wandb_callback],
     checkpoint_config=checkpoint_config,
-    storage_path=os.path.abspath(config.LOCAL_DIR),
-    # local_dir=os.path.abspath(config.LOCAL_DIR)
+    # storage_path=config.LOCAL_DIR,
+    # local_dir=config.LOCAL_DIR
 )
 
 train_ds,val_ds, preprocessor = get_train_data("train.csv")
@@ -77,7 +77,7 @@ trainer = TorchTrainer(
     scaling_config=scaling_config,
     datasets={"train": train_ds, "val": val_ds},
     dataset_config=dataset_config,
-    # metadata={"class_to_index": preprocessor.class_to_index}
+    metadata={"class_to_index": preprocessor.class_to_index}
 )
 
 initial_params = [{"train_loop_config": {"dropout_p": 0.5, "lr": 1e-4, "lr_factor": 0.8, "lr_patience": 3}}]

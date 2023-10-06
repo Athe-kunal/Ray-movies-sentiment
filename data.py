@@ -112,7 +112,7 @@ def tokenize(batch: Dict) -> Dict:
     """
     # tokenizer = BertTokenizer.from_pretrained("allenai/scibert_scivocab_uncased", return_dict=False)
     tokenizer = RobertaTokenizer.from_pretrained("roberta-base", return_dict=False)
-    encoded_inputs = tokenizer(batch["text"].tolist(), return_tensors="np", padding="longest",max_length=512)
+    encoded_inputs = tokenizer(batch["text"].tolist(), return_tensors="np", padding="longest",max_length=512,truncation=True)
     return dict(ids=encoded_inputs["input_ids"], masks=encoded_inputs["attention_mask"], targets=np.array(batch["sent_label"]))
 
 
